@@ -1,12 +1,19 @@
 package org.infinispan.online.service.endpoint;
 
+import static junit.framework.TestCase.assertNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.infinispan.online.service.utils.TestObjectCreator.generateConstBytes;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+
+import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import io.fabric8.kubernetes.api.model.Pod;
+
 import org.infinispan.client.hotrod.CacheTopologyInfo;
 import org.infinispan.client.hotrod.RemoteCache;
 import org.infinispan.client.hotrod.RemoteCacheManager;
@@ -14,28 +21,29 @@ import org.infinispan.client.hotrod.configuration.Configuration;
 import org.infinispan.client.hotrod.configuration.ConfigurationBuilder;
 import org.infinispan.client.hotrod.configuration.SaslQop;
 import org.infinispan.online.service.utils.TestObjectCreator;
+import org.infinispan.online.service.utils.TrustStore;
 
-import static junit.framework.TestCase.assertNull;
-import static org.infinispan.online.service.utils.TestObjectCreator.generateConstBytes;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import io.fabric8.kubernetes.api.model.Pod;
 
 public class HotRodTester implements EndpointTester {
 
-   private final String serverName;
+   private final String serviceName;
+   private final String trustStorePath;
    private String hotRodKey = "hotRodKey";
 
-   public HotRodTester(String serverName) {
-      this.serverName = serverName;
+   public HotRodTester(String serviceName, String trustStoreDir) {
+      this.serviceName = serviceName;
+      this.trustStorePath = TrustStore.getPath(trustStoreDir, serviceName);
    }
 
    public void testBasicEndpointCapabilities(URL urlToService) {
-      testBasicEndpointCapabilities(urlToService, true);
+      testBasicEndpointCapabilities(urlToService, true, true);
    }
 
-   public void testBasicEndpointCapabilities(URL urlToService, boolean authenticate) {
+   private void testBasicEndpointCapabilities(URL urlToService, boolean authenticate, boolean encrypt) {
       //given
-      RemoteCache<String, String> defaultCache = getDefaultCache(urlToService, authenticate);
+      RemoteCacheManager cachingService = getRemoteCacheManager(urlToService, authenticate, encrypt);
+      RemoteCache<String, String> defaultCache = cachingService.getCache();
 
       //when
       defaultCache.put("should_default_cache_be_accessible_via_hot_rod", "test");
@@ -48,7 +56,7 @@ public class HotRodTester implements EndpointTester {
    @Override
    public void testPutPerformance(URL urlToService, long timeout, TimeUnit timeUnit) {
       //given
-      RemoteCache<String, String> defaultCache = getDefaultCache(urlToService, true);
+      RemoteCache<String, String> defaultCache = getDefaultCache(urlToService);
       long endTime = System.currentTimeMillis() + TimeUnit.MILLISECONDS.convert(timeout, timeUnit);
       TestObjectCreator testObjectCreator = new TestObjectCreator();
 
@@ -62,11 +70,11 @@ public class HotRodTester implements EndpointTester {
 
    @Override
    public void testIfEndpointIsProtected(URL urlToService) {
-      testBasicEndpointCapabilities(urlToService, false);
+      testBasicEndpointCapabilities(urlToService, false, true);
    }
 
    public void testPodsVisible(URL urlToService, List<Pod> pods) {
-      RemoteCache<String, String> defaultCache = getDefaultCache(urlToService, false);
+      RemoteCache<String, String> defaultCache = getDefaultCache(urlToService);
       CacheTopologyInfo topology = defaultCache.getCacheTopologyInfo();
 
       List<String> podIPs = pods.stream()
@@ -81,40 +89,60 @@ public class HotRodTester implements EndpointTester {
       assertThat(cacheNodeIPs).isEqualTo(podIPs);
    }
 
-   public RemoteCache<String, String> getDefaultCache(URL urlToService, boolean authenticate) {
-      RemoteCacheManager cachingService = getRemoteCacheManager(urlToService, authenticate);
+   private RemoteCache<String, String> getDefaultCache(URL urlToService) {
+      RemoteCacheManager cachingService = getRemoteCacheManager(urlToService);
       return cachingService.getCache();
    }
 
-   public RemoteCache<String, String> getNamedCache(URL urlToService, String cacheName, boolean authenticate) {
-      RemoteCacheManager cachingService = getRemoteCacheManager(urlToService, authenticate);
+   public RemoteCache<String, String> getNamedCache(URL urlToService, String cacheName) {
+      RemoteCacheManager cachingService = getRemoteCacheManager(urlToService);
       return cachingService.getCache(cacheName);
    }
 
    public int getNumberOfNodesInTheCluster(URL urlToService) {
-      return getDefaultCache(urlToService, true).getCacheTopologyInfo().getSegmentsPerServer().keySet().size();
-
+      return getDefaultCache(urlToService).getCacheTopologyInfo().getSegmentsPerServer().keySet().size();
    }
 
-   public RemoteCacheManager getRemoteCacheManager(URL urlToService, boolean authenticate) {
+   @Override
+   public void testIfEndpointIsEncrypted(URL urlToService) {
+      testBasicEndpointCapabilities(urlToService, true, false);
+   }
+
+   private RemoteCacheManager getRemoteCacheManager(URL urlToService) {
+      return getRemoteCacheManager(urlToService, true, true);
+   }
+
+   private RemoteCacheManager getRemoteCacheManager(URL urlToService, boolean authenticate, boolean encrypt) {
+
+      File f = new File(trustStorePath);
+      if (!f.exists()) {
+         String path = Paths.get("").toAbsolutePath().toString();
+         String msg = String.format("Truststore doesn't exist. Truststore dir: %s\n Execution dir: %s", trustStorePath, path);
+         throw new IllegalStateException(msg);
+      }
+
       Configuration cachingServiceClientConfiguration = new ConfigurationBuilder()
          .addServer()
          .host(urlToService.getHost())
          .port(urlToService.getPort())
-         .security().authentication().enabled(authenticate)
+         .security()
+         .ssl().enabled(encrypt)
+         .trustStoreFileName(trustStorePath)
+         .trustStorePassword(TrustStore.TRUSTSTORE_PASSWORD)
+         .authentication().enabled(authenticate)
          .username("test")
          .password("test")
          .realm("ApplicationRealm")
          .saslMechanism("DIGEST-MD5")
          .saslQop(SaslQop.AUTH)
-         .serverName(serverName)
+         .serverName(serviceName)
          .build();
 
       return new RemoteCacheManager(cachingServiceClientConfiguration);
    }
 
    public void putGetTest(URL hotRodService) {
-      RemoteCacheManager cachingService = getRemoteCacheManager(hotRodService, true);
+      RemoteCacheManager cachingService = getRemoteCacheManager(hotRodService);
 
       stringPutGetTest(cachingService);
       stringUpdateGetTest(cachingService);
@@ -175,7 +203,7 @@ public class HotRodTester implements EndpointTester {
 
    public void evictionTest(URL hotRodService) {
       //given
-      RemoteCacheManager cachingService = getRemoteCacheManager(hotRodService, true);
+      RemoteCacheManager cachingService = getRemoteCacheManager(hotRodService);
       RemoteCache<String, byte[]> byteArrayCache = cachingService.getCache();
       byte[] firstValue = generateConstBytes(4096);
 

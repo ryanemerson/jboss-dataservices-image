@@ -46,6 +46,15 @@ public class RESTTester implements EndpointTester {
       post(urlToService.toString() + "rest/default/should_default_cache_be_accessible_via_REST", "test", 401, false);
    }
 
+   @Override
+   public void testIfEndpointIsEncrypted(URL urlToService) {
+      // TODO
+   }
+
+   private void post(String url, String body, int expectedCode) {
+      post(url, body, expectedCode, true);
+   }
+
    private void post(String url, String body, int expectedCode, boolean authenticate) {
       RequestSpecification spec = given();
       if (authenticate)
