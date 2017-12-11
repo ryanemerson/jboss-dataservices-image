@@ -61,7 +61,8 @@
          "kind": "Service",
          "metadata": {
             "annotations": {
-               "description": "Headless service for StatefulSets"
+               "description": "Headless service for StatefulSets",
+               "service.alpha.openshift.io/serving-cert-secret-name": "service-certs"
             },
             "labels": {
                "application": "${APPLICATION_NAME}"
@@ -198,10 +199,6 @@
                               "value": "CACHING-SERVICE"
                            },
                            {
-                              "name": "PROFILE",
-                              "value": "CACHING-SERVICE"
-                           },
-                           {
                               "name": "OPENSHIFT_KUBE_PING_LABELS",
                               "value": "application=${APPLICATION_NAME}"
                            },
@@ -212,6 +209,14 @@
                                     "fieldPath": "metadata.namespace"
                                  }
                               }
+                           },
+                           {
+                              "name": "KEYSTORE_FILE",
+                              "value": "/var/run/secrets/java.io/keystores/keystore.jks"
+                           },
+                           {
+                              "name": "KEYSTORE_PASSWORD",
+                              "value": "${KEYSTORE_PASSWORD}"
                            },
                            {
                               "name": "APPLICATION_USER",
@@ -284,6 +289,10 @@
                            {
                               "name": "${APPLICATION_NAME}-data",
                               "mountPath": "/opt/jboss/infinispan-server/standalone/data"
+                           },
+                           {
+                              "name": "${APPLICATION_NAME}-data",
+                              "mountPath": "/var/run/secrets/java.io/keystores"
                            }
                         ],
                         "resources": {
@@ -294,6 +303,59 @@
                            "limits": {
                               "memory": "${TOTAL_CONTAINER_MEM}Mi"
                            }
+                        }
+                     }
+                  ],
+                  "initContainers": [
+                     {
+                        "name": "pem-to-keystore",
+                        "image": "registry.access.redhat.com/redhat-sso-7/sso71-openshift:1.1-16",
+                        "env": [
+                           {
+                              "name": "TLS_KEY_FILE",
+                              "value": "/var/run/secrets/openshift.io/serviceaccount/tls.key"
+                           },
+                           {
+                              "name": "CRT_FILE",
+                              "value": "/var/run/secrets/openshift.io/serviceaccount/tls.crt"
+                           },
+                           {
+                              "name": "KEYSTORE_PKCS12",
+                              "value": "/var/run/secrets/java.io/keystores/keystore.pkcs12"
+                           },
+                           {
+                              "name": "KEYSTORE_FILE",
+                              "value": "/var/run/secrets/java.io/keystores/keystore.jks"
+                           },
+                           {
+                              "name": "KEYSTORE_PASSWORD",
+                              "value": "${KEYSTORE_PASSWORD}"
+                           }
+                        ],
+                        "command": [
+                           "/bin/bash"
+                        ],
+                        "args": [
+                           "-c",
+                           "openssl pkcs12 -export -inkey $TLS_KEY_FILE -in $CRT_FILE -out $KEYSTORE_PKCS12 -password pass:$KEYSTORE_PASSWORD && keytool -importkeystore -noprompt -srckeystore $KEYSTORE_PKCS12 -srcstoretype pkcs12 -destkeystore $KEYSTORE_FILE -storepass $KEYSTORE_PASSWORD -srcstorepass $KEYSTORE_PASSWORD"
+                        ],
+                        "volumeMounts": [
+                           {
+                              "name": "${APPLICATION_NAME}-data",
+                              "mountPath": "/var/run/secrets/java.io/keystores"
+                           },
+                           {
+                              "name": "service-certs",
+                              "mountPath": "/var/run/secrets/openshift.io/serviceaccount"
+                           }
+                        ]
+                     }
+                  ],
+                  "volumes": [
+                     {
+                        "name": "service-certs",
+                        "secret": {
+                           "secretName": "service-certs"
                         }
                      }
                   ],
@@ -371,6 +433,13 @@
          "name": "APPLICATION_USER_PASSWORD",
          "displayName": "Client Password",
          "description": "Password for client applications",
+         "generate": "expression",
+         "from": "[a-zA-Z0-9]{16}"
+      },
+      {
+         "name": "KEYSTORE_PASSWORD",
+         "displayName": "Java Keystore Password",
+         "description": "Password for the created java keystore",
          "generate": "expression",
          "from": "[a-zA-Z0-9]{16}"
       }
