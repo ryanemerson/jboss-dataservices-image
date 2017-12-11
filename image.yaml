@@ -28,3 +28,8 @@ modules:
         - name: os-datagrid-online-services-configuration
         - name: os-datagrid-online-services-probes
         - name: os-datagrid-performance-logging
+packages:
+   repositories:
+      - jboss-os
+   install:
+      - openssl
