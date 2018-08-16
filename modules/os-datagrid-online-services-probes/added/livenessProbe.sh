@@ -1,13 +1,19 @@
 #!/bin/sh
 
+if [ true = "${DEBUG}" ] ; then
+    # short circuit liveness check in dev mode
+    exit 0
+fi
+
 OUTPUT=/tmp/liveness-output
 ERROR=/tmp/liveness-error
 LOG=/tmp/liveness-log
 
-COUNT=1
+# liveness failure before management interface is up will cause the probe to fail
+COUNT=30
 SLEEP=1
 DEBUG_SCRIPT=false
-PROBE_IMPL="probe.jdg.jolokia.JdgProbe"
+PROBE_IMPL="probe.eap.dmr.EapProbe probe.jdg.jolokia.JdgProbe"
 
 if [ $# -gt 0 ] ; then
     COUNT=$1
@@ -32,5 +38,10 @@ fi
 if python $JBOSS_HOME/bin/probes/runner.py -c READY -c NOT_READY --maxruns $COUNT --sleep $SLEEP $DEBUG_OPTIONS $PROBE_IMPL; then
     exit 0
 fi
+
+if [ "$DEBUG_SCRIPT" == "true" ]; then
+  ps -ef | grep java | grep standalone | awk '{ print $2 }' | xargs kill -3
+fi
+
 exit 1
 

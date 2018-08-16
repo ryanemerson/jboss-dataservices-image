@@ -4,10 +4,10 @@ OUTPUT=/tmp/readiness-output
 ERROR=/tmp/readiness-error
 LOG=/tmp/readiness-log
 
-COUNT=1
+COUNT=30
 SLEEP=1
 DEBUG=false
-PROBE_IMPL="probe.jdg.jolokia.JdgProbe"
+PROBE_IMPL="probe.eap.dmr.EapProbe probe.jdg.jolokia.JdgProbe"
 
 if [ $# -gt 0 ] ; then
     COUNT=$1
