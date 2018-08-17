@@ -92,18 +92,18 @@
          "kind": "Service",
          "metadata": {
             "annotations": {
-               "description": "The web server's HTTP port."
+               "description": "The web server's HTTPS port."
             },
             "labels": {
                "application": "${APPLICATION_NAME}"
             },
-            "name": "${APPLICATION_NAME}-http"
+            "name": "${APPLICATION_NAME}-https"
          },
          "spec": {
             "ports": [
                {
                   "port": 8080,
-                  "targetPort": 8080
+                  "targetPort": 8443
                }
             ],
             "selector": {
@@ -186,15 +186,43 @@
                               "value": "8888"
                            },
                            {
-                              "name": "SSL_KEYSTORE_PATH",
-                              "value": "/var/run/secrets/java.io/keystores/${APPLICATION_NAME}.p12"
+                              "name": "HTTPS_KEYSTORE",
+                              "value": "${APPLICATION_NAME}.p12"
                            },
                            {
-                              "name": "SSL_KEYSTORE_PASSWORD",
+                              "name": "HTTPS_KEYSTORE_DIR",
+                              "value": "/var/run/secrets/java.io/keystores"
+                           },
+                           {
+                              "name": "HTTPS_NAME",
+                              "value": "NOT USED"
+                           },
+                           {
+                              "name": "HTTPS_PASSWORD",
                               "value": "${APPLICATION_NAME}"
                            },
                            {
-                              "name": "APPLICATION_USER",
+                              "name": "SASL_SERVER_NAME",
+                              "value": "caching-service"
+                           },
+                           {
+                              "name": "INFINISPAN_CONNECTORS",
+                              "value": "hotrod,rest"
+                           },
+                           {
+                              "name": "HOTROD_AUTHENTICATION",
+                              "value": "TRUE"
+                           },
+                           {
+                              "name": "HOTROD_ENCRYPTION",
+                              "value": "TRUE"
+                           },
+                           {
+                              "name": "REST_SECURITY_DOMAIN",
+                              "value": "ApplicationRealm"
+                           },
+                           {
+                              "name": "USERNAME",
                               "valueFrom": {
                                  "secretKeyRef" : {
                                     "name" : "${APPLICATION_NAME}",
@@ -203,7 +231,7 @@
                               }
                            },
                            {
-                              "name": "APPLICATION_USER_PASSWORD",
+                              "name": "PASSWORD",
                               "valueFrom": {
                                  "secretKeyRef" : {
                                     "name" : "${APPLICATION_NAME}",

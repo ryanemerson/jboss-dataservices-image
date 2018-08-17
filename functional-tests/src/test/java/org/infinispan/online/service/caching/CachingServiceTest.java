@@ -59,7 +59,7 @@ public class CachingServiceTest {
    public void before() throws MalformedURLException {
       readinessCheck.waitUntilAllPodsAreReady(client);
       hotRodService = handle.getServiceWithName("caching-service-app-hotrod");
-      restService = handle.getServiceWithName("caching-service-app-http");
+      restService = handle.getServiceWithName("caching-service-app-https");
    }
 
    @After

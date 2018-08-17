@@ -119,8 +119,8 @@ stop-openshift:
 .PHONY: stop-openshift
 
 build-image:
-	$(CEKIT_CMD)
-	cekit build --target target-docker --tag $(DEV_IMAGE_FULL_NAME)
+	#$(CEKIT_CMD)
+	#cekit build --target target-docker --tag $(DEV_IMAGE_FULL_NAME)
 .PHONY: build-image
 
 _login_to_docker:
