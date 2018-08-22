@@ -49,7 +49,7 @@ _IMAGE = $(_DOCKER_REGISTRY)/$(_TEST_PROJECT)/$(DEV_IMAGE_NAME):$(DEV_IMAGE_TAG)
 _TESTRUNNER_PORT = 80
 endif
 
-_DEV_IMAGE_STREAM = $(_DOCKER_REGISTRY)/$(_TEST_PROJECT)/$(DEV_IMAGE_NAME):$(DEV_IMAGE_TAG)
+_DEV_IMAGE_STREAM = $(DEV_IMAGE_NAME):$(DEV_IMAGE_TAG)
 
 # This username and password is hardcoded (and base64 encoded) in the Ansible
 # Service Broker template
@@ -119,8 +119,8 @@ stop-openshift:
 .PHONY: stop-openshift
 
 build-image:
-	#$(CEKIT_CMD)
-	#cekit build --target target-docker --tag $(DEV_IMAGE_FULL_NAME)
+	$(CEKIT_CMD)
+	cekit build --target target-docker --tag $(DEV_IMAGE_FULL_NAME)
 .PHONY: build-image
 
 _login_to_docker:
